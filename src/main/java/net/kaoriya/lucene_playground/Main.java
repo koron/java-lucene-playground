@@ -14,12 +14,13 @@ public class Main {
         return Util.toUTF16(s, new IntsRefBuilder());
     }
 
-    public static void query(FST<CharsRef> fst, String key) throws Exception {
+    public static void fstQuery(FST<CharsRef> fst, String key) throws Exception {
         CharsRef v = Util.get(fst, toUTF16(key));
         System.out.println("query: " + key + " -> " + v);
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void fstTrial() throws Exception {
+        System.out.println("build a FST");
         // build a FST.
         Builder<CharsRef> b = new Builder<>(FST.INPUT_TYPE.BYTE1,
                 CharSequenceOutputs.getSingleton());
@@ -30,13 +31,17 @@ public class Main {
         FST<CharsRef> f = b.finish();
         System.out.println("f=" + f);
 
-        query(f, "foo");
-        query(f, "bar");
-        query(f, "foobar");
-        query(f, "f");
-        query(f, "fo");
-        query(f, "b");
-        query(f, "ba");
+        System.out.println("make some queries:");
+        fstQuery(f, "foo");
+        fstQuery(f, "bar");
+        fstQuery(f, "foobar");
+        fstQuery(f, "f");
+        fstQuery(f, "fo");
+        fstQuery(f, "b");
+        fstQuery(f, "ba");
     }
 
+    public static void main(String[] args) throws Exception {
+        fstTrial();
+    }
 }
