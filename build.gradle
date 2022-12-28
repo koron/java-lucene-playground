@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.apache.lucene:lucene-core:9.0.0'
+    implementation 'org.apache.lucene:lucene-core:9.4.+'
 
     testImplementation 'commons-io:commons-io:2.11.+'
     testImplementation 'org.apache.commons:commons-lang3:3.12.+'

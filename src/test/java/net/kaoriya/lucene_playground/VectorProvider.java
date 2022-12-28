@@ -4,13 +4,12 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.lucene.index.RandomAccessVectorValues;
-import org.apache.lucene.index.RandomAccessVectorValuesProducer;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.util.BytesRef;
 
 // https://github.com/apache/lucene/blob/fc67d6aa6e2bf2ec8ff4b2b8e4a763f3f706de29/lucene/core/src/test/org/apache/lucene/util/hnsw/KnnGraphTester.java
 
-class VectorProvider extends VectorValues implements RandomAccessVectorValues, RandomAccessVectorValuesProducer {
+class VectorProvider extends VectorValues implements RandomAccessVectorValues {
 
     int doc = -1;
     private final List<Vector2D> data;
@@ -23,7 +22,6 @@ class VectorProvider extends VectorValues implements RandomAccessVectorValues, R
         return data.get(idx);
     }
 
-    @Override
     public RandomAccessVectorValues randomAccess() {
         return new VectorProvider(data);
     }

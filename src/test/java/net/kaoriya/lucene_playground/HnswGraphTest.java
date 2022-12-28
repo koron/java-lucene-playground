@@ -17,8 +17,8 @@ import java.util.SplittableRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.lucene.codecs.KnnVectorsFormat;
-import org.apache.lucene.codecs.lucene90.Lucene90Codec;
-import org.apache.lucene.codecs.lucene90.Lucene90HnswVectorsFormat;
+import org.apache.lucene.codecs.lucene94.Lucene94Codec;
+import org.apache.lucene.codecs.lucene94.Lucene94HnswVectorsFormat;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.KnnVectorField;
 import org.apache.lucene.document.StoredField;
@@ -27,6 +27,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.VectorEncoding;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.index.VectorValues;
 import org.apache.lucene.search.ScoreDoc;
@@ -35,6 +36,7 @@ import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.hnsw.HnswGraph;
 import org.apache.lucene.util.hnsw.HnswGraphBuilder;
+import org.apache.lucene.util.hnsw.HnswGraphSearcher;
 import org.apache.lucene.util.hnsw.NeighborQueue;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -46,6 +48,8 @@ public class HnswGraphTest {
 
     public static final int dim = 2;
     public static final float[] query = new float[] { 0.98f, 0.01f };
+
+    static final int VISITED_LIMIT = 100;
 
     // The goal vector will be inserted into the graph which is very close to the actual query vector.
     public static final Vector2D goalVector = new Vector2D(query[0] - 0.01f, query[1] + 0.01f);
@@ -99,19 +103,20 @@ public class HnswGraphTest {
     //@Ignore("Does not return the expected values. I assume there are extra steps needed to create a correlation between graph nodeId and id of the vector.")
     public void testSearchViaHnswGraph() throws IOException {
         // Build the graph manually and run the query
-        HnswGraphBuilder builder = new HnswGraphBuilder(vectors, similarityFunction, maxConn, beamWidth, seed);
+        HnswGraphBuilder builder = HnswGraphBuilder.create(vectors, VectorEncoding.FLOAT32, similarityFunction, maxConn, beamWidth, seed);
         HnswGraph hnsw = builder.build(vectors.randomAccess());
 
         // Run a search
-        NeighborQueue nn = HnswGraph.search(
+        NeighborQueue nn = HnswGraphSearcher.search(
                 query,
                 10, // search result size
-                5,
                 vectors.randomAccess(), // ? Why do I need to specify the graph values again?
+                VectorEncoding.FLOAT32,
                 similarityFunction, // ? Why can I specify a different similarityFunction for search. Should that not be the same that was used for graph creation?
                 hnsw,
                 null,
-                new SplittableRandom(RandomUtils.nextLong())); // Random seed to entry vector of the search
+                VISITED_LIMIT);
+                //new SplittableRandom(RandomUtils.nextLong())); // Random seed to entry vector of the search
 
         // Print the results
         System.out.println();
@@ -135,7 +140,7 @@ public class HnswGraphTest {
                 assertEquals(indexedDoc, values.size());
                 assertEquals(vectorData.size(), ctx.reader().maxDoc());
                 assertEquals(vectorData.size(), ctx.reader().numDocs());
-                // KnnGraphValues graphValues = ((Lucene90HnswVectorsReader) ((PerFieldKnnVectorsFormat.FieldsReader) ((CodecReader) ctx.reader())
+                // KnnGraphValues graphValues = ((Lucene94HnswVectorsReader) ((PerFieldKnnVectorsFormat.FieldsReader) ((CodecReader) ctx.reader())
                 // .getVectorReader())
                 // .getFieldReader("field"))
                 // .getGraphValues("field");
@@ -160,10 +165,10 @@ public class HnswGraphTest {
         int indexedDoc = 0;
         IndexWriterConfig iwc = new IndexWriterConfig()
             .setCodec(
-                    new Lucene90Codec() {
+                    new Lucene94Codec() {
                         @Override
                         public KnnVectorsFormat getKnnVectorsFormatForField(String field) {
-                            return new Lucene90HnswVectorsFormat(maxConn, beamWidth);
+                            return new Lucene94HnswVectorsFormat(maxConn, beamWidth);
                         }
                     });
         try (IndexWriter iw = new IndexWriter(dir, iwc)) {
@@ -185,18 +190,19 @@ public class HnswGraphTest {
     }
 
     private TopDocs doKnnSearch(
-            IndexReader reader, String field, float[] vector, int docLimit, int fanout) throws IOException {
+            IndexReader reader, String field, float[] vector, int docLimit, int fanout) throws IOException
+    {
         TopDocs[] results = new TopDocs[reader.leaves().size()];
         for (LeafReaderContext ctx : reader.leaves()) {
             Bits liveDocs = ctx.reader().getLiveDocs();
-            results[ctx.ord] = ctx.reader().searchNearestVectors(field, vector, docLimit + fanout, liveDocs);
+            results[ctx.ord] = ctx.reader().searchNearestVectors(field, vector, docLimit + fanout, liveDocs, VISITED_LIMIT);
             int docBase = ctx.docBase;
             for (ScoreDoc scoreDoc : results[ctx.ord].scoreDocs) {
                 scoreDoc.doc += docBase;
             }
         }
         return TopDocs.merge(docLimit, results);
-            }
+    }
 
     private List<Vector2D> createVectorData(int len) {
         // Just using a list for now to make it easier to matchup with document ids later on
