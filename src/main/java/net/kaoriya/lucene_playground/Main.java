@@ -20,6 +20,7 @@ public class Main {
     }
 
     public static void fstTrial() throws Exception {
+        System.out.println("fstTrial");
         System.out.println("build a FST:");
         // build a FST.
         FSTCompiler<CharsRef> c = new FSTCompiler<>(FST.INPUT_TYPE.BYTE1,
